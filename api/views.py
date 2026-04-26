@@ -8,7 +8,8 @@ from rest_framework.response import Response
 from lessons.models import LessonEntry
 from users.models import User
 
-from .permissions import IsOwnerOrTeacher, IsTeacher
+from .filters import LessonEntryFilter
+from .permissions import IsOwnerOrTeacher, IsStudent, IsTeacher
 from .serializers import GradeSerializer, LessonEntrySerializer
 
 
@@ -17,7 +18,7 @@ class LessonEntryViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     filter_backends  = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
-    filterset_fields = ['date', 'student']
+    filterset_class  = LessonEntryFilter
     search_fields    = ['comment']
     ordering_fields  = ['date', 'created_at', 'grade']
     ordering         = ['-date']
@@ -32,6 +33,8 @@ class LessonEntryViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == 'grade':
             return [IsAuthenticated(), IsTeacher()]
+        if self.action == 'create':
+            return [IsAuthenticated(), IsStudent()]
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), IsOwnerOrTeacher()]
         return [IsAuthenticated()]
@@ -51,7 +54,7 @@ class LessonEntryViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(
-            LessonEntrySerializer(entry).data,
+            LessonEntrySerializer(entry, context={'request': request}).data,
             status=status.HTTP_200_OK,
         )
 

@@ -10,6 +10,13 @@ class IsTeacher(BasePermission):
         return bool(request.user and request.user.role == User.TEACHER)
 
 
+class IsStudent(BasePermission):
+    """Доступ только для студентов."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.role == User.STUDENT)
+
+
 class IsOwnerOrTeacher(BasePermission):
     """Студент — только свои записи. Преподаватель — любые."""
 

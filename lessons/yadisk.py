@@ -26,8 +26,9 @@ async def _upload_one(session, filename, file_bytes, token):
     # 2. PUT файл (без Authorization — как в теории YaCut)
     async with session.put(upload_url, data=file_bytes) as resp:
         resp.raise_for_status()
-        location = urllib.parse.unquote(resp.headers.get('Location', ''))
-        location = location.replace('/disk', '')
+        # Яндекс Диск возвращает путь вида "disk:/app/filename"
+        # Для шага 3 используем тот же path, что передавали в шаге 1
+        location = path
 
     # 3. Ссылка на скачивание
     async with session.get(
