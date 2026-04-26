@@ -15,11 +15,11 @@ class LessonEntryViewSet(viewsets.ModelViewSet):
     serializer_class = LessonEntrySerializer
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filter_backends  = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['date', 'student']
-    search_fields = ['comment']
-    ordering_fields = ['date', 'created_at', 'grade']
-    ordering = ['-date']
+    search_fields    = ['comment']
+    ordering_fields  = ['date', 'created_at', 'grade']
+    ordering         = ['-date']
 
     def get_queryset(self):
         user = self.request.user
