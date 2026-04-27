@@ -202,6 +202,30 @@ textarea { resize: vertical; }
 /* ── Entry form ───────────────────────────────────────── */
 .entry-form { display: flex; flex-direction: column; gap: .9rem; }
 
+/* ── Student journal ──────────────────────────────────── */
+.page-title { font-size: 1.6rem; margin-bottom: 1.5rem; }
+
+.new-entry-card {
+  border: 2px solid var(--primary);
+  background: linear-gradient(135deg, #f0f4ff 0%, #fff 60%);
+  margin-bottom: 2rem;
+}
+.new-entry-header {
+  display: flex; align-items: center; gap: .6rem; margin-bottom: 1.2rem;
+}
+.new-entry-header h2 { font-size: 1.1rem; margin: 0; }
+.new-entry-icon { font-size: 1.3rem; }
+
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem;
+}
+.section-header h2 { font-size: 1.1rem; color: var(--muted); }
+
+.required-star { color: var(--danger); margin-left: 2px; }
+.field-hint { font-weight: 400; color: var(--muted); font-size: .82rem; margin-left: 4px; }
+.file-chosen { font-size: .82rem; color: var(--primary); margin-top: .25rem; display: block; }
+
 /* ── Misc ─────────────────────────────────────────────── */
 .error { color: var(--danger); font-size: .85rem; }
 .spinner { text-align: center; padding: 3rem; color: var(--muted); }

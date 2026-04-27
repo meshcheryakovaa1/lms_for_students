@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { getEntries, createEntry, updateEntry, deleteEntry } from '../api/client';
 
-const EMPTY_FORM = { date: '', comment: '', file: null };
+const today = () => new Date().toISOString().split('T')[0];
+const EMPTY_FORM = { date: today(), comment: '', file: null };
 
-function EntryForm({ initial = EMPTY_FORM, onSave, onCancel }) {
-  const [form, setForm] = useState(initial);
+/* ── Форма создания / редактирования записи ──────────────── */
+function EntryForm({ initial = EMPTY_FORM, onSave, onCancel, submitLabel = 'Сохранить запись' }) {
+  const [form, setForm] = useState({ ...initial });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef();
+
+  // Сбрасываем форму когда меняется initial (после успешного создания)
+  useEffect(() => { setForm({ ...initial }); setError(''); }, [initial?.resetKey]);
 
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -16,17 +21,26 @@ function EntryForm({ initial = EMPTY_FORM, onSave, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.comment.trim()) { setError('Напишите, что делали на занятии'); return; }
     setError('');
     setSaving(true);
     try {
       const fd = new FormData();
       fd.append('date', form.date);
-      fd.append('comment', form.comment);
+      fd.append('comment', form.comment.trim());
       if (form.file) fd.append('file', form.file);
       await onSave(fd);
+      // Сбрасываем форму после успешного сохранения
+      setForm({ date: today(), comment: '', file: null });
+      if (fileRef.current) fileRef.current.value = '';
     } catch (err) {
       const d = err.response?.data;
-      setError(d ? JSON.stringify(d) : 'Ошибка сохранения');
+      if (typeof d === 'object') {
+        const msgs = Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+        setError(msgs);
+      } else {
+        setError('Ошибка сохранения. Попробуйте ещё раз.');
+      }
     } finally {
       setSaving(false);
     }
@@ -34,19 +48,33 @@ function EntryForm({ initial = EMPTY_FORM, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="entry-form">
-      <label>Дата занятия
-        <input type="date" name="date" value={form.date} onChange={handleChange} required />
+      <div className="form-row">
+        <label style={{ maxWidth: 200 }}>Дата занятия
+          <input type="date" name="date" value={form.date} onChange={handleChange} required />
+        </label>
+      </div>
+
+      <label>Что делал на занятии <span className="required-star">*</span>
+        <textarea
+          name="comment"
+          value={form.comment}
+          onChange={handleChange}
+          rows={4}
+          required
+          placeholder="Опишите подробно: какую тему разбирали, что получилось, что вызвало трудности..."
+        />
       </label>
-      <label>Что делал на занятии
-        <textarea name="comment" value={form.comment} onChange={handleChange} rows={3} required />
-      </label>
-      <label>Файл (необязательно)
+
+      <label>Прикрепить файл <span className="field-hint">(домашнее задание, скриншот, код)</span>
         <input type="file" ref={fileRef} onChange={handleFile} />
+        {form.file && <span className="file-chosen">Выбран: {form.file.name}</span>}
       </label>
+
       {error && <p className="error">{error}</p>}
+
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={saving}>
-          {saving ? 'Сохранение...' : 'Сохранить'}
+          {saving ? 'Сохранение...' : submitLabel}
         </button>
         {onCancel && (
           <button type="button" className="btn btn-outline" onClick={onCancel}>Отмена</button>
@@ -56,18 +84,20 @@ function EntryForm({ initial = EMPTY_FORM, onSave, onCancel }) {
   );
 }
 
+/* ── Бейдж оценки ─────────────────────────────────────────── */
 function GradeBadge({ grade }) {
-  if (grade == null) return <span className="badge badge-none">Нет оценки</span>;
+  if (grade == null) return <span className="badge badge-none">Ожидает оценки</span>;
   const cls = grade >= 7 ? 'good' : grade >= 5 ? 'mid' : 'bad';
-  return <span className={`badge badge-${cls}`}>{grade}/10</span>;
+  return <span className={`badge badge-${cls}`}>{grade} / 10</span>;
 }
 
+/* ── Главная страница журнала ─────────────────────────────── */
 export default function StudentJournalPage() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null); // id записи
+  const [editing, setEditing] = useState(null);   // id редактируемой записи
   const [search, setSearch] = useState('');
+  const [resetKey, setResetKey] = useState(0);    // для сброса формы после создания
 
   const load = async () => {
     setLoading(true);
@@ -85,7 +115,7 @@ export default function StudentJournalPage() {
 
   const handleCreate = async (fd) => {
     await createEntry(fd);
-    setShowForm(false);
+    setResetKey((k) => k + 1);   // триггер сброса формы
     load();
   };
 
@@ -103,32 +133,39 @@ export default function StudentJournalPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h1>Мой журнал занятий</h1>
-        <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditing(null); }}>
-          + Новая запись
-        </button>
-      </div>
+      <h1 className="page-title">Мой журнал занятий</h1>
 
-      <div className="search-bar">
-        <input
-          placeholder="Поиск по комментарию..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+      {/* ── Форма новой записи — всегда видна ── */}
+      <div className="card new-entry-card">
+        <div className="new-entry-header">
+          <span className="new-entry-icon">✏️</span>
+          <h2>Новая запись</h2>
+        </div>
+        <EntryForm
+          initial={{ ...EMPTY_FORM, resetKey }}
+          onSave={handleCreate}
+          submitLabel="Добавить в журнал"
         />
       </div>
 
-      {showForm && (
-        <div className="card">
-          <h3>Новая запись</h3>
-          <EntryForm onSave={handleCreate} onCancel={() => setShowForm(false)} />
+      {/* ── Список прошлых записей ── */}
+      <div className="section-header">
+        <h2>История записей</h2>
+        <div className="search-bar" style={{ margin: 0 }}>
+          <input
+            placeholder="Поиск по тексту..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-      )}
+      </div>
 
       {loading ? (
         <div className="spinner">Загрузка...</div>
       ) : entries.length === 0 ? (
-        <div className="empty">Записей пока нет. Создайте первую!</div>
+        <div className="empty">
+          Записей пока нет — заполни форму выше и добавь первую!
+        </div>
       ) : (
         <div className="entries-list">
           {entries.map((entry) => (
@@ -140,6 +177,7 @@ export default function StudentJournalPage() {
                     initial={{ date: entry.date, comment: entry.comment, file: null }}
                     onSave={handleUpdate}
                     onCancel={() => setEditing(null)}
+                    submitLabel="Сохранить изменения"
                   />
                 </>
               ) : (
@@ -158,11 +196,11 @@ export default function StudentJournalPage() {
                     <p className="graded-by">Оценил: {entry.graded_by}</p>
                   )}
                   <div className="entry-actions">
-                    <button className="btn btn-sm" onClick={() => { setEditing(entry.id); setShowForm(false); }}>
-                      Редактировать
+                    <button className="btn btn-sm" onClick={() => setEditing(entry.id)}>
+                      ✏️ Редактировать
                     </button>
                     <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
-                      Удалить
+                      🗑 Удалить
                     </button>
                   </div>
                 </>
